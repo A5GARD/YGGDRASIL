@@ -1,14 +1,14 @@
 {
   "name": "@a5gard/yggdrasil",
   "description": "Asgard Forge CLI",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.ts",
   "private": false,
-    "bin": {
+  "bin": {
     "yggdrasil": "dist/index.js"
   },
   "scripts": {
-       "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "tsup src/index.ts --format esm --dts --clean",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -36,6 +36,5 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "tsup": "^8.0.1"
-
   }
 }
