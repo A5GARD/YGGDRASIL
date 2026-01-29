@@ -1,14 +1,14 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import { execSync } from 'child_process';
 import * as p from '@clack/prompts';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { spawnSync } from 'bun';
-// current file location F:\forge\index.js
-const currentExtVersion = "4.0.115" //F:\DevStack\package.json
-const currentUIVersion = "1.0.124" //F:\playground\package.json
-const currentIconsVersion = "1.0.58" //F:\icons\package.json
+
+const currentExtVersion = "4.0.115"
+const currentUIVersion = "1.0.124"
+const currentIconsVersion = "1.0.58"
 
 async function detectPackageManager(): Promise<string> {
     try {
@@ -25,7 +25,6 @@ async function detectPackageManager(): Promise<string> {
 }
 
 async function getLatestLibraryVersion(): Promise<string> {
-    // have to edit this because as of now we are currently getting the correct data  {"_id":"@catalystsoftware/ui","_rev":"16-358149fe48f929901be77a9badbe82bd","name":"@catalystsoftware/ui","dist-tags":{"latest":"1.0.17"},
     try {
         const response = await fetch('https://registry.npmjs.org/@a5gard/midgardr-cli', { headers: { 'Accept': 'application/json' } });
         if (!response.ok) return currentUIVersion;
@@ -35,6 +34,7 @@ async function getLatestLibraryVersion(): Promise<string> {
         return currentUIVersion;
     }
 }
+
 async function getLatestIconVersion(): Promise<string> {
     try {
         const response = await fetch('https://registry.npmjs.org/@a5gard/baldr', { headers: { 'Accept': 'application/json' } });
@@ -45,8 +45,8 @@ async function getLatestIconVersion(): Promise<string> {
         return currentIconsVersion;
     }
 }
+
 async function getLatestExtVersion(): Promise<string> {
-    // REPLACE THESE WITH YOUR ACTUAL NAMES
     const publisher = "skyler";
     const extensionName = "ocrmnav";
 
@@ -63,24 +63,22 @@ async function getLatestExtVersion(): Promise<string> {
                         { filterType: 7, value: `${publisher}.${extensionName}` }
                     ],
                 }],
-                flags: 0x1 | 0x10, // 0x1: Latest version only, 0x10: Include version metadata
+                flags: 0x1 | 0x10,
             }),
         });
 
         if (!response.ok) return currentExtVersion;
 
         const data = await response.json();
-
-        // The Marketplace API nesting is deep as fuck, so we safely navigate it:
         const extension = data.results?.[0]?.extensions?.[0];
         const version = extension?.versions?.[0]?.version;
 
         return version || currentExtVersion;
     } catch (error) {
-        // Fallback if the Marketplace is down or network fails
         return currentExtVersion;
     }
 }
+
 async function getProjectState(targetPath: string) {
     let localUIVer: string | null = null;
     let hasPackageJson = false;
@@ -107,11 +105,10 @@ async function getProjectState(targetPath: string) {
 
     try {
         const extensions = await fs.readdir(path.join(targetPath, '.vscode'));
-        localHasExtension = extensions.some(ext => ext.includes('midgardr'));
+        localHasExtension = extensions.some((ext: string) => ext.includes('midgardr'));
     } catch (e) {
         localHasExtension = false;
     }
-
 
     const remoteUIVer = await getLatestLibraryVersion();
     const remoteIconsVer = await getLatestIconVersion();
@@ -119,10 +116,8 @@ async function getProjectState(targetPath: string) {
 
     return { localUIVer, localIconsVer, hasPackageJson, remoteUIVer, remoteIconsVer, localHasExtension, remoteExtVer };
 }
-async function showSmartMenu(targetPath: string, isPremium: boolean, state) {
-    const spinner = ora('Checking project status...').start();
-    spinner.stop();
 
+async function showSmartMenu(targetPath: string, isPremium: boolean, state: { localUIVer: string | null; localIconsVer: string | null; hasPackageJson: boolean; remoteUIVer: string; remoteIconsVer: string; localHasExtension: boolean; remoteExtVer: string }) {
     const choices = [];
 
     if (!state.hasPackageJson) {
@@ -162,19 +157,14 @@ async function showSmartMenu(targetPath: string, isPremium: boolean, state) {
     if (!state.localHasExtension) {
         choices.push({ name: 'Install VS Code Extension', value: 'install-ext' });
     } else if (state.localHasExtension && state.remoteExtVer !== "1.0.0") {
-        // Logic for update-ext if versioning is tracked
         choices.push({ name: 'Update VS Code Extension', value: 'update-ext' });
     }
-
 
     choices.push(new inquirer.Separator());
     choices.push({ name: chalk.red('✗ Exit'), value: 'exit' });
 
-    renderBoxedHeader(
-        isPremium ? 'MIÐGARÐR UI - PREMIUM' : 'MIÐGARÐR UI',
-        `Context: ${path.basename(targetPath)}`,
-        isPremium ? chalk.magenta : chalk.cyan
-    );
+    console.log(chalk.cyan.bold(`\nMIÐGARÐR UI ${isPremium ? '- PREMIUM' : ''}`));
+    console.log(chalk.dim(`Context: ${path.basename(targetPath)}\n`));
 
     const { action } = await inquirer.prompt([{
         type: 'list',
@@ -186,94 +176,86 @@ async function showSmartMenu(targetPath: string, isPremium: boolean, state) {
 
     return action;
 }
-async function installUi(projectPath, which) {
+
+async function installUi(projectPath: string, which: string) {
     switch (which) {
         case 'ui-interactive':
         case 'create-new':
-            return spawnSync('bunx', ['@catalystsoftware/ui'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
         case 'ui-full-install':
-            return spawnSync('bunx', ['@catalystsoftware/ui', 'full-install'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui', 'full-install'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
         case 'ui-full-install-ngin':
-            return spawnSync('bunx', ['@catalystsoftware/ui', 'full-w-ngin'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui', 'full-w-ngin'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
         case 'ui-select-components':
-            return spawnSync('bunx', ['@catalystsoftware/ui', 'select-components'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui', 'select-components'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
         case 'ui-configure-tailwind-postcss':
-            return spawnSync('bunx', ['@catalystsoftware/ui', 'configure-tailwind-postcss'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui', 'configure-tailwind-postcss'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
         case 'ui-configure-ngin':
-            return spawnSync('bunx', ['@catalystsoftware/ui', 'configure-ngin'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui', 'configure-ngin'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
         case 'ui-create-config':
-            return spawnSync('bunx', ['@catalystsoftware/ui', 'create-config'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui', 'create-config'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
         case 'ui-import-call':
-            return spawnSync('bunx', ['@catalystsoftware/ui', 'import-call'], {
-                stdio: 'inherit',
-                shell: true,
+            return spawnSync(['bunx', '@catalystsoftware/ui', 'import-call'], {
+                stdio: ['inherit', 'inherit', 'inherit'],
                 cwd: projectPath
             });
     }
 }
-async function installIcons(projectPath) {
+async function installIcons(projectPath: string) {
     const pkg = await detectPackageManager()
     if (pkg === 'pnpm') {
         return execSync('pnpm install @catalystsoftware/icons', {
             stdio: 'inherit',
-            shell: true,
             cwd: projectPath
         });
     } else if (pkg === 'npm') {
         return execSync('npm install @catalystsoftware/icons', {
             stdio: 'inherit',
-            shell: true,
             cwd: projectPath
         });
     }
 }
-async function updateIcons(projectPath) {
+
+async function updateIcons(projectPath: string) {
     const pkg = await detectPackageManager()
     if (pkg === 'pnpm') {
         return execSync('pnpm update @catalystsoftware/icons', {
             stdio: 'inherit',
-            shell: true,
             cwd: projectPath
         });
     } else if (pkg === 'npm') {
         return execSync('npm update @catalystsoftware/icons', {
             stdio: 'inherit',
-            shell: true,
             cwd: projectPath
         });
     }
 }
+
 async function installExtension() {
     return execSync('code --install-extension skyler.ocrmnav --force', { stdio: 'inherit' });
 }
+
 async function updateExtension() {
     console.log(chalk.blue('Checking for extension updates...'));
     return execSync('code --install-extension skyler.ocrmnav --force', { stdio: 'inherit' });
@@ -284,13 +266,12 @@ async function CreateRemix2() {
         placeholder: 'my-catalyst-app'
     });
     if (p.isCancel(projectName)) process.exit(0);
-    await spawnSync('npx', ['create-remix@latest', projectName as string], {
-        stdio: 'inherit',
-        shell: true
+    spawnSync(['npx', 'create-remix@latest', projectName as string], {
+        stdio: ['inherit', 'inherit', 'inherit']
     });
     return projectName
 }
-async function handleAction(action: string, isPremium: boolean, targetPath: string, state) {
+async function handleAction(action: string, isPremium: boolean, targetPath: string, state: { localUIVer: string | null; localIconsVer: string | null; hasPackageJson: boolean; remoteUIVer: string; remoteIconsVer: string; localHasExtension: boolean; remoteExtVer: string }) {
     switch (action) {
         case 'create-new':
             const projectFolderName = await CreateRemix2();
@@ -301,7 +282,7 @@ async function handleAction(action: string, isPremium: boolean, targetPath: stri
                 console.log(chalk.green('\n✔ Created new project!'));
             }
             break;     
-            case 'ui-interactive':
+        case 'ui-interactive':
         case 'ui-full-install':
         case 'ui-full-install-ngin':
         case 'ui-select-components':
@@ -338,14 +319,15 @@ async function handleAction(action: string, isPremium: boolean, targetPath: stri
     }
 }
 
-
 async function main() {
     const args = process.argv.slice(2);
     const pathFlagIndex = args.indexOf('-p');
     let targetPath = process.cwd();
-    if (pathFlagIndex !== -1 && args[pathFlagIndex + 1]) {        targetPath = path.resolve(args[pathFlagIndex + 1]);    }
+    if (pathFlagIndex !== -1 && args[pathFlagIndex + 1]) {
+        targetPath = path.resolve(args[pathFlagIndex + 1]);
+    }
 
-    const isPremium = false// await checkSecretAccess(args);
+    const isPremium = false;
     const state = await getProjectState(targetPath);
     const action = await showSmartMenu(targetPath, isPremium, state);
     await handleAction(action, isPremium, targetPath, state);
